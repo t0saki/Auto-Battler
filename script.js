@@ -658,22 +658,34 @@ combatLogic(dt) {
                     <div class="c-meta">${originName} / ${className}</div>
                 </div>
             `;
-            el.onclick = () => this.buyUnit(k);
+            el.onclick = () => this.buyUnit(k, el);
             container.appendChild(el);
         }
     }
 
-    buyUnit(type) {
+    buyUnit(type, cardElem) {
         if (this.state !== 'PLANNING') return;
         const cost = UNIT_STATS[type].cost;
+
+        // 简单的防呆：如果你已经点过这张卡导致它隐藏了，就不能再买了
+        // 防止连点器或者网络延迟造成的双重购买
+        if (cardElem && cardElem.style.visibility === 'hidden') return;
+
         if (this.gold >= cost) {
-            for(let r=3; r<GRID_H; r++) {
-                for(let c=0; c<GRID_W; c++) {
-                    if(!this.units.find(u=>u.team===0 && u.r===r && u.c===c)) {
+            for (let r = 3; r < GRID_H; r++) {
+                for (let c = 0; c < GRID_W; c++) {
+                    if (!this.units.find(u => u.team === 0 && u.r === r && u.c === c)) {
                         this.gold -= cost;
                         const u = new Unit(type, 0, r, c);
                         this.units.push(u);
                         this.checkSynergies();
+
+                        // [新增这里] 购买成功后，隐藏商店里的这张卡
+                        if (cardElem) {
+                            cardElem.style.visibility = 'hidden'; // 占位隐藏，不破坏布局
+                            cardElem.style.pointerEvents = 'none'; // 禁止再次点击
+                        }
+
                         return;
                     }
                 }
