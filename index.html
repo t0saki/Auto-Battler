@@ -3,21 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Auto Battler - Pro Edition</title>
+    <title>Auto Battler</title>
     <style>
         :root {
             --bg-color: #000000;
-            --glass-surface: rgba(30, 30, 40, 0.65);
+            --glass-surface: rgba(30, 30, 40, 0.75); /* 稍微加深背景提高可读性 */
             --glass-border: rgba(255, 255, 255, 0.12);
-            --glass-highlight: rgba(255, 255, 255, 0.05);
             --accent-color: #0a84ff;
             --accent-gradient: linear-gradient(135deg, #0a84ff, #5e5ce6);
             --text-primary: #f5f5f7;
             --text-secondary: #86868b;
-            --cost-1: #a0a0a0;
-            --cost-2: #30d158;
-            --cost-3: #0a84ff;
-            --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            --cost-1: #a0a0a0; --cost-2: #30d158; --cost-3: #0a84ff;
+            --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", Helvetica, sans-serif;
         }
 
         body {
@@ -104,7 +101,12 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            pointer-events: auto; 
+            pointer-events: auto;
+            transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); /* Smooth Zoom */
+        }
+        /* 当商店打开时，棋盘缩小并上移 */
+        #canvas-wrapper.board-shrunk {
+            transform: scale(0.85) translateY(-60px);
         }
 
         canvas {
@@ -150,7 +152,7 @@
             position: absolute;
             bottom: 30px;
             left: 50%;
-            transform: translateX(-50%) translateY(150%);
+            transform: translateX(-50%) translateY(150%); /* Hidden */
             width: auto;
             min-width: 600px;
             padding: 16px;
@@ -160,10 +162,36 @@
             transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
             z-index: 100;
         }
+        #shop-dock.visible { transform: translateX(-50%) translateY(0); }
+        
+        /* Minimized State: Slide down but keep header visible */
+        #shop-dock.minimized { transform: translateX(-50%) translateY(calc(100% - 15px)); opacity: 0.8; }
+        #shop-dock.minimized:hover { opacity: 1; transform: translateX(-50%) translateY(calc(100% - 25px)); } /* Peek hint */
 
-        #shop-dock.visible {
-            transform: translateX(-50%) translateY(0);
+        /* Toggle Button for Shop */
+        .dock-header {
+            position: absolute;
+            top: -20px;
+            left: 0;
+            width: 100%; 
+            display: flex;
+            justify-content: center;
+            pointer-events: none;
         }
+        .dock-toggle-btn {
+            pointer-events: auto;
+            cursor: pointer;
+            background: var(--glass-surface);
+            border: 1px solid var(--glass-border);
+            border-bottom: none;
+            border-radius: 12px 12px 0 0;
+            padding: 4px 20px;
+            color: #aaa;
+            font-size: 12px;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.2);
+            transition: 0.2s;
+        }
+        .dock-toggle-btn:hover { color: white; background: var(--accent-color); }
 
         .shop-cards {
             display: flex;
@@ -301,7 +329,32 @@
             .card { flex-shrink: 0; }
             #top-bar { padding: 0 12px; height: 50px; }
             .stat-group { gap: 12px; font-size: 13px; }
-            #synergy-float { display: none; } 
+            
+            /* Mobile Synergies: Hidden by default, shown via Modal */
+            #synergy-float {
+                display: none; /* Override inline styles via JS class */
+            }
+            /* Special class when toggled on mobile */
+            #synergy-float.mobile-active {
+                display: flex;
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 80%;
+                max-height: 70vh;
+                overflow-y: auto;
+                background: rgba(20,20,25,0.95);
+                padding: 20px;
+                border-radius: 20px;
+                border: 1px solid rgba(255,255,255,0.1);
+                z-index: 2000;
+                box-shadow: 0 0 50px black;
+            }
+            #btn-syn-mobile { display: flex; }
+            
+            /* Disable Board Shrink on Mobile (Screen too small) */
+            #canvas-wrapper.board-shrunk { transform: none !important; }
         }
     </style>
 </head>
@@ -318,21 +371,31 @@
                 <div class="stat-item" style="color: #fff;"><span class="stat-icon">⚔️</span> <span id="ui-round">1</span></div>
             </div>
             <div class="control-group">
+                <button id="btn-syn-mobile" class="icon-btn" onclick="game.toggleSynergyMobile()">🔮</button>
                 <button class="icon-btn" onclick="game.toggleLang()">🌐</button>
                 <button class="icon-btn" onclick="game.showRankings()">🏆</button>
+                <button class="icon-btn" onclick="game.showGuide()">📖</button> 
             </div>
         </div>
 
         <div id="synergy-float"></div>
 
         <div id="shop-dock" class="glass-panel pointer-events-auto">
+            <div class="dock-header">
+                <div class="dock-toggle-btn" onclick="game.toggleShopMinimize()">
+                    <span id="shop-chevron">▼ Hide Shop</span>
+                </div>
+            </div>
             <div class="shop-cards" id="shop-container"></div>
-            <div class="shop-actions">
-                <button class="action-btn btn-reroll" onclick="game.rerollShop()">
-                    <span style="font-size:18px; margin-right:5px;">↺</span> <span id="txt-reroll">Reroll</span> <span style="opacity:0.6; font-size:12px; margin-left:4px;">(2g)</span>
+
+            <div class="shop-actions"> <button class="action-btn btn-reroll" onclick="game.rerollShop()">
+                    <span style="font-size:18px; margin-right:5px;">↺</span> 
+                    <span id="txt-reroll">Reroll</span> 
+                    <span style="opacity:0.6; font-size:12px; margin-left:4px;">(2g)</span>
                 </button>
                 <button id="btn-battle" class="action-btn btn-battle" onclick="game.toggleState()">
-                    <span style="font-size:18px;">⚔️</span> <span id="txt-battle">Start Battle</span>
+                    <span style="font-size:18px;">⚔️</span> 
+                    <span id="txt-battle">Start Battle</span>
                 </button>
             </div>
         </div>
@@ -356,6 +419,17 @@
             <h2 id="t-rank-title">Leaderboard</h2>
             <div id="rank-list-content" style="max-height:300px; overflow-y:auto; margin:20px 0; font-size:14px;"></div>
             <button class="action-btn btn-reroll" style="width:100%; justify-content:center;" onclick="document.getElementById('rank-modal').style.display='none'">Close</button>
+        </div>
+    </div>
+
+    <div id="guide-modal" class="modal-overlay pointer-events-auto" onclick="if(event.target===this) this.style.display='none'">
+        <div class="modal-card" style="width: 90%; max-width: 550px; text-align: left;">
+            <h2 id="t-guide-title" style="margin-bottom: 15px;">Game Guide</h2>
+            
+            <div id="t-guide-content" style="max-height: 60vh; overflow-y: auto; font-size: 13px; line-height: 1.6; color: #ccc; padding-right: 10px;">
+                </div>
+
+            <button class="action-btn btn-reroll" style="width:100%; margin-top:20px; justify-content:center;" onclick="document.getElementById('guide-modal').style.display='none'">Close</button>
         </div>
     </div>
 
@@ -390,7 +464,51 @@
                     'Ranger': { name: "Ranger", desc: ""},
                     'Mage': { name: "Mage", desc: ""},
                     'Assassin': { name: "Assassin", desc: ""}
-                }
+                },
+                shopHide: "▼ Hide Shop",
+                shopOpen: "▲ Open Shop",guideTitle: "Commander's Manual",
+                guideContent: `
+<h3 style="color:#ff9f43; margin-top:0;">⚔️ Quick Start (TL;DR)</h3>
+<ul style="padding-left:20px; margin-bottom:20px;">
+    <li><strong>Goal:</strong> Defeat enemies each round. Don't let HP hit 0.</li>
+    <li><strong>Controls:</strong> Drag units to the <strong>bottom half</strong> area. Click "BATTLE".</li>
+    <li><strong>Economy:</strong> Gain <strong>+5 Gold</strong> per round. Reroll costs <strong>2 Gold</strong>.</li>
+    <li><strong>Key to Win:</strong> Collect units with same icons to trigger <strong>Synergies</strong>.</li>
+    <li><strong>Tactic:</strong> Tanks in front, DPS (Archers/Mages) in the back.</li>
+</ul>
+
+<hr style="border-color:rgba(255,255,255,0.1); margin: 20px 0;">
+
+<h3 style="color:#00d2d3; margin-top:0;">📖 Complete Commander Manual</h3>
+
+<h4 style="color:#fff; margin:15px 0 5px;">1. Resources</h4>
+<p><strong>❤️ HP:</strong> Start with 100. Lose 10 HP on defeat.<br>
+<strong>💰 Gold:</strong> Start with 12. Don't reroll too much early on! Save gold for high-cost units (like Witch).</p>
+
+<h4 style="color:#fff; margin:15px 0 5px;">2. Unit Guide</h4>
+<ul style="padding-left:20px; margin:0;">
+    <li>🛡️ <strong>Mecha ($1):</strong> Highest HP. Best frontline tank.</li>
+    <li>⚔️ <strong>Knight ($1):</strong> Balanced warrior.</li>
+    <li>🏹 <strong>Ranger ($2):</strong> Longest range, high crit damage.</li>
+    <li>🥷 <strong>Ninja ($2):</strong> Fastest attack speed.</li>
+    <li>🔮 <strong>Witch ($3):</strong> Highest skill damage, but slow speed.</li>
+</ul>
+
+<h4 style="color:#fff; margin:15px 0 5px;">3. Synergy System</h4>
+<p>Deploy units of the same type to get global buffs:</p>
+<ul style="padding-left:20px; margin:0;">
+    <li><strong style="color:#00d2d3">🔵 Cyber (2):</strong> Allies +35% ATK Speed (Highly Recommended)</li>
+    <li><strong style="color:#a29bfe">🟢 Isekai (2):</strong> Allies +25% Attack Dmg</li>
+    <li><strong style="color:#ff9f43">🛡️ Guardian (2):</strong> Start with +300 Shield (Great for early game)</li>
+    <li><strong style="color:#ff6b6b">🔴 Academy (1):</strong> Rangers get Crit Rate bonus</li>
+    <li><strong style="color:#fd79a8">🟣 Arcane (2):</strong> Skill DMG +40%</li>
+</ul>
+
+<h4 style="color:#fff; margin:15px 0 5px;">4. Strategy Tips</h4>
+<p><strong>Early Game (Round 1-3):</strong> Buy 'Mecha' to tank. 'Ranger' is great value alone.<br>
+<strong>Mid Game (Round 4-6):</strong> Try to build 'Cyber' (2) synergy. The speed boost is massive.<br>
+<strong>Positioning:</strong> Protect your Rangers/Witches in the corner, surrounded by Tanks.</p>
+`,
             },
             zh: {
                 reroll: "刷新商店",
@@ -421,7 +539,51 @@
                     'Ranger': { name: "射手", desc: ""},
                     'Mage': { name: "法师", desc: ""},
                     'Assassin': { name: "刺客", desc: ""}
-                }
+                },
+                shopHide: "▼ 隐藏商店",
+                shopOpen: "▲ 展开商店",guideTitle: "作战指南",
+                guideContent: `
+<h3 style="color:#ff9f43; margin-top:0;">⚔️ 简略指南 (太长不看版)</h3>
+<ul style="padding-left:20px; margin-bottom:20px;">
+    <li><strong>核心目标：</strong> 保持血量不归零，击败每一波敌人。</li>
+    <li><strong>基本操作：</strong> 将棋子拖拽到<strong>下半区</strong>布阵，点击“开始战斗”。</li>
+    <li><strong>经济系统：</strong> 每回合固定 <strong>+5 金币</strong>。刷新商店消耗 <strong>2 金币</strong>。</li>
+    <li><strong>获胜秘诀：</strong> 凑齐相同种族的棋子触发<strong>羁绊BUFF</strong>。</li>
+    <li><strong>排兵布阵：</strong> 坦克放前排抗伤，射手/法师放后排输出。</li>
+</ul>
+
+<hr style="border-color:rgba(255,255,255,0.1); margin: 20px 0;">
+
+<h3 style="color:#00d2d3; margin-top:0;">📖 完整游戏手册</h3>
+
+<h4 style="color:#fff; margin:15px 0 5px;">1. 资源管理</h4>
+<p><strong>❤️ 生命值：</strong> 初始100。战斗失败扣10血。归零游戏结束。<br>
+<strong>💰 金币：</strong> 初始12。不要在前期疯狂刷新(Reroll)，存钱买高费卡（如魔女）是关键。</p>
+
+<h4 style="color:#fff; margin:15px 0 5px;">2. 棋子图鉴</h4>
+<ul style="padding-left:20px; margin:0;">
+    <li>🛡️ <strong>重装机 ($1):</strong> 血量最高，前排肉盾首选。</li>
+    <li>⚔️ <strong>骑士姬 ($1):</strong> 均衡型战士。</li>
+    <li>🏹 <strong>弓道部 ($2):</strong> 射程最远，高暴击输出。</li>
+    <li>🥷 <strong>赛博忍 ($2):</strong> 攻速最快，近战爆发。</li>
+    <li>🔮 <strong>魔女 ($3):</strong> 技能伤害最高，但攻速慢。</li>
+</ul>
+
+<h4 style="color:#fff; margin:15px 0 5px;">3. 羁绊系统 (Synergies)</h4>
+<p>凑齐特定数量的同类棋子可获得全局增益：</p>
+<ul style="padding-left:20px; margin:0;">
+    <li><strong style="color:#00d2d3">🔵 赛博 (2人):</strong> 全员攻速 +35% (强力推荐)</li>
+    <li><strong style="color:#a29bfe">🟢 异世界 (2人):</strong> 全员攻击 +25%</li>
+    <li><strong style="color:#ff9f43">🛡️ 守护者 (2人):</strong> 开局获得 +300 护盾 (前期神技)</li>
+    <li><strong style="color:#ff6b6b">🔴 学院 (1人):</strong> 射手获得暴击加成</li>
+    <li><strong style="color:#fd79a8">🟣 奥术 (2人):</strong> 技能伤害 +40%</li>
+</ul>
+
+<h4 style="color:#fff; margin:15px 0 5px;">4. 进阶策略</h4>
+<p><strong>前期 (1-3回合):</strong> 优先找【重装机】抗伤。单挂一个【弓道部】性价比极高。<br>
+<strong>中期 (4-6回合):</strong> 尝试凑出【2赛博】羁绊，高攻速能让你的队伍产生质变。<br>
+<strong>站位:</strong> 采用九宫格包围站位，把脆皮输出放在角落，防止被切。</p>
+`,
             }
         };
 
@@ -601,6 +763,7 @@
                 this.state = 'PLANNING';
                 this.dragging = null;
                 this.bindInput();
+            this.initShopToggle();
             }
 
             handleResize() {
@@ -910,7 +1073,7 @@ combatLogic(dt) {
                     el.className = 'card';
                     el.dataset.cost = data.cost;
                     el.innerHTML = `
-                        <div class="c-cost">💎${data.cost}</div>
+                        <div class="c-cost">💰${data.cost}</div>
                         <div class="card-img-box"><img src="${ASSET_SOURCES[k]}"></div>
                         <div class="card-info">
                             <div class="c-name">${unitName}</div>
@@ -972,7 +1135,12 @@ combatLogic(dt) {
             toggleState() {
                 if (this.state === 'PLANNING') {
                     this.state = 'FIGHTING';
+                    
+                    // 隐藏商店
                     document.getElementById('shop-dock').classList.remove('visible');
+                    // 恢复棋盘大小
+                    document.getElementById('canvas-wrapper').classList.remove('board-shrunk');
+                    
                     document.getElementById('txt-battle').innerText = LANG[this.lang].battleFighting;
                     document.getElementById('btn-battle').style.filter = "grayscale(1)";
                 }
@@ -980,7 +1148,17 @@ combatLogic(dt) {
 
             endRound(win) {
                 this.state = 'PLANNING';
-                document.getElementById('shop-dock').classList.add('visible');
+                const dock = document.getElementById('shop-dock');
+                
+                // 显示商店
+                dock.classList.remove('minimized'); // 自动展开
+                dock.classList.add('visible');
+                document.getElementById('shop-chevron').innerText = "▼ Hide Shop";
+
+                // 缩小棋盘 (Smart Viewport)
+                if (window.innerWidth > 850) {
+                    document.getElementById('canvas-wrapper').classList.add('board-shrunk');
+                }
                 
                 if (!win) this.hp -= 10;
                 if (this.hp <= 0) {
@@ -991,10 +1169,16 @@ combatLogic(dt) {
                 this.round++;
                 this.gold += 5;
                 
-                this.units = this.units.filter(u => u.team===0);
+                // 1. 清理敌人
+                this.units = this.units.filter(u => u.team === 0);
+
+                // 2. 修复重叠 (关键修复)
+                this.resolveOverlaps();
+
+                // 3. 重置状态
                 this.units.forEach(u => {
                     u.hp = u.maxHp; u.mana = 0; u.isDead = false;
-                    u.snap(); // Reset pos
+                    u.snap(); // 根据修复后的 r,c 回正位置
                 });
                 
                 this.spawnEnemy();
@@ -1019,6 +1203,11 @@ combatLogic(dt) {
                 document.getElementById('t-login-title').innerText = L.loginTitle;
                 document.getElementById('t-login-desc').innerText = L.loginDesc;
                 document.getElementById('t-rank-title').innerText = L.rankTitle;
+                const dock = document.getElementById('shop-dock');
+                const isMinimized = dock.classList.contains('minimized');
+                document.getElementById('shop-chevron').innerText = isMinimized ? L.shopOpen : L.shopHide;
+                document.getElementById('t-guide-title').innerText = L.guideTitle;
+                document.getElementById('t-guide-content').innerHTML = L.guideContent;
             }
 
             checkLogin() {
@@ -1034,6 +1223,130 @@ combatLogic(dt) {
                 document.getElementById('login-modal').style.display = 'none';
                 this.start();
             }
+
+            // --- 新增：防重叠算法 ---
+            resolveOverlaps() {
+                // 记录已被占据的坐标 "r,c"
+                const occupied = new Set();
+                
+                // 过滤出玩家单位
+                const myUnits = this.units.filter(u => u.team === 0);
+
+                myUnits.forEach(u => {
+                    // 1. 检查当前单位的理想位置 (u.r, u.c) 是否已经被刚才处理过的单位占据
+                    let key = `${u.r},${u.c}`;
+                    
+                    // 2. 如果位置冲突（Set里已经有了），或者位置非法（有时候战斗会导致坐标跑偏），则寻找新位置
+                    // 注意：还要确保单位在合法的棋盘范围内 (r>=3)
+                    if (occupied.has(key) || u.r < 3 || u.r >= GRID_H || u.c < 0 || u.c >= GRID_W) {
+                        // 传入 occupied 集合，确保找到的位置绝对是空的
+                        const spot = this.findNearestEmptySpot(u.r, u.c, occupied);
+                        if (spot) {
+                            u.r = spot.r;
+                            u.c = spot.c;
+                            key = `${u.r},${u.c}`;
+                        } else {
+                            console.warn("无法找到空位安置单位:", u);
+                        }
+                    }
+                    
+                    // 3. 标记该位置已被占据
+                    occupied.add(key);
+                    
+                    // 4. 强制更新像素坐标，防止视觉上还在飞
+                    u.targetX = u.getGridX(u.c);
+                    u.targetY = u.getGridY(u.r);
+                    u.pixelX = u.targetX;
+                    u.pixelY = u.targetY;
+                });
+            }
+
+            // 配合修改 findNearestEmptySpot，确保搜索逻辑正确
+            findNearestEmptySpot(startR, startC, occupiedSet) {
+                // 如果当前位置非法，强制修正到中心点开始搜索
+                if (startR < 3) startR = 3;
+                
+                // 0. 先检查当前位置是否可用 (防止实际上是范围溢出但位置本身没被占用的情况)
+                if (startR >= 3 && startR < GRID_H && startC >= 0 && startC < GRID_W && !occupiedSet.has(`${startR},${startC}`)) {
+                    return {r: startR, c: startC};
+                }
+
+                const maxDist = Math.max(GRID_W, GRID_H);
+                
+                // 螺旋/曼哈顿距离扩散
+                for (let d = 1; d < maxDist; d++) {
+                    // 遍历所有 r,c
+                    for (let r = 3; r < GRID_H; r++) {
+                        for (let c = 0; c < GRID_W; c++) {
+                            // 距离计算
+                            const dist = Math.abs(r - startR) + Math.abs(c - startC);
+                            if (dist === d) {
+                                if (!occupiedSet.has(`${r},${c}`)) {
+                                    return {r, c};
+                                }
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
+
+            initShopToggle() {
+                // 初始化商店状态
+                const dock = document.getElementById('shop-dock');
+                const wrapper = document.getElementById('canvas-wrapper');
+                
+                // 添加窗口大小变化监听器
+                window.addEventListener('resize', () => {
+                    if (window.innerWidth <= 850 && wrapper.classList.contains('board-shrunk')) {
+                        wrapper.classList.remove('board-shrunk');
+                    }
+                });
+            }
+
+            // --- 新增：控制商店折叠 ---
+            toggleShopMinimize() {
+                const dock = document.getElementById('shop-dock');
+                const wrapper = document.getElementById('canvas-wrapper');
+                // 删除旧的 btnText 定义，直接获取 DOM
+                const btnLabel = document.getElementById('shop-chevron'); 
+                const L = LANG[this.lang]; // 获取当前语言包
+
+                dock.classList.toggle('minimized');
+                
+                if (dock.classList.contains('minimized')) {
+                    wrapper.classList.remove('board-shrunk');
+                    btnLabel.innerText = L.shopOpen; // 使用语言包
+                } else {
+                    if (window.innerWidth > 850) {
+                        wrapper.classList.add('board-shrunk');
+                    }
+                    btnLabel.innerText = L.shopHide; // 使用语言包
+                }
+            }
+
+            // --- 新增：移动端羁绊开关 ---
+            toggleSynergyMobile() {
+                const el = document.getElementById('synergy-float');
+                const btn = document.getElementById('btn-syn-mobile');
+                
+                el.classList.toggle('mobile-active');
+                btn.classList.toggle('active');
+
+                // 点击遮罩关闭 (简单实现：如果点击了 canvas 就关闭)
+                if (el.classList.contains('mobile-active')) {
+                    // 添加一次性点击监听器来关闭
+                    const closeFn = (e) => {
+                        if (!el.contains(e.target) && e.target !== btn) {
+                            el.classList.remove('mobile-active');
+                            btn.classList.remove('active');
+                            document.removeEventListener('click', closeFn);
+                        }
+                    };
+                    setTimeout(() => document.addEventListener('click', closeFn), 100);
+                }
+            }
+
             start() {
                 this.updateUI();
                 setTimeout(() => document.getElementById('shop-dock').classList.add('visible'), 500);
@@ -1041,6 +1354,13 @@ combatLogic(dt) {
             showRankings() {
                 document.getElementById('rank-modal').style.display = 'flex';
                 document.getElementById('rank-list-content').innerHTML = `<div style="padding:10px;">1. ${localStorage.getItem('u_name') || 'You'} - Round ${this.round}</div>`;
+            }
+
+            showGuide() {
+                // 强制刷新一次内容，防止语言没同步
+                document.getElementById('t-guide-title').innerText = LANG[this.lang].guideTitle;
+                document.getElementById('t-guide-content').innerHTML = LANG[this.lang].guideContent;
+                document.getElementById('guide-modal').style.display = 'flex';
             }
         }
 
