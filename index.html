@@ -1009,7 +1009,19 @@ combatLogic(dt) {
 
             start() {
                 this.updateUI();
-                setTimeout(() => document.getElementById('shop-dock').classList.add('visible'), 500);
+                setTimeout(() => {
+                    // 1. 获取元素
+                    const dock = document.getElementById('shop-dock');
+                    const wrapper = document.getElementById('canvas-wrapper');
+
+                    // 2. 显示商店
+                    dock.classList.add('visible');
+
+                    // 3. 【关键修复】直接添加缩小类
+                    // 不需要在这里判断 window.innerWidth，因为 style.css 中的 @media 查询
+                    // 会自动拦截移动端（宽度 <= 850px），防止其缩小。
+                    wrapper.classList.add('board-shrunk');
+                }, 500);
             }
             showRankings() {
                 document.getElementById('rank-modal').style.display = 'flex';
