@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Auto Battler - Image Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f0c29;
+            --bg-gradient: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --text-main: #ffffff;
+            --accent: #00f260;
+            
+            /* Rarity Colors */
+            --rare-1: #b2bec3;
+            --rare-2: #55efc4;
+            --rare-3: #0984e3;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg-dark); /* 纯色背景，让游戏背景图更突出 */
+            color: var(--text-main);
+            font-family: 'Nunito', 'Noto Sans SC', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        /* --- UI Components --- */
+        #header {
+            width: 95%;
+            height: 60px;
+            min-height: 60px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+            margin-top: 10px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            z-index: 100;
+            box-sizing: border-box;
+        }
+
+        .stat-group { display: flex; gap: 15px; font-size: 16px; font-weight: 800; }
+        .stat-item { display: flex; align-items: center; gap: 5px; text-shadow: 0 0 10px rgba(255,255,255,0.3); }
+        .icon { font-size: 20px; }
+
+        .header-controls { display: flex; gap: 8px; }
+        
+        .ui-btn {
+            cursor: pointer;
+            background: rgba(0,0,0,0.3);
+            padding: 6px 12px;
+            border-radius: 20px;
+            transition: 0.3s;
+            font-weight: bold;
+            font-size: 14px;
+            border: 1px solid transparent;
+            display: flex; align-items: center; gap: 5px;
+            white-space: nowrap;
+        }
+        .ui-btn:hover, .ui-btn.active { border-color: var(--accent); background: rgba(0,0,0,0.5); }
+
+        /* Main Layout */
+        #main-area {
+            display: flex;
+            width: 98%;
+            flex-grow: 1;
+            margin-top: 10px;
+            gap: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #synergy-panel {
+            width: 220px;
+            min-width: 220px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+            padding: 10px;
+            overflow-y: auto;
+            transition: 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+        #synergy-panel h3 { margin: 0 0 10px 0; text-align: center; color: var(--rare-2); letter-spacing: 1px; font-size: 16px; }
+        
+        .syn-box {
+            margin-bottom: 8px;
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            border-left: 3px solid #555;
+            transition: 0.3s;
+        }
+        .syn-box.active {
+            border-left: 3px solid var(--accent);
+            background: linear-gradient(90deg, rgba(0,242,96,0.1), transparent);
+        }
+        .syn-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin-bottom: 2px; }
+        .syn-desc { font-size: 11px; color: #ccc; line-height: 1.3; }
+
+        /* Canvas & Background */
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            border-radius: 12px;
+            background-color: #1a1a1a;
+            background-image: url('assets/background.png');
+            background-repeat: no-repeat;
+            background-position: center center;
+            background-size: cover;
+            /* 增加内阴影让边缘更柔和 */
+            box-shadow: inset 0 0 80px rgba(0,0,0,0.7);
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        
+        canvas {
+            /* 移除之前的阴影和边框，让它融入背景 */
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        /* Bottom Control Panel */
+        #bottom-panel {
+            width: 100%;
+            height: 190px; /* 从 220px 减小到 190px */
+            min-height: 190px;
+            background: linear-gradient(to top, #0f0c29 90%, transparent);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            padding-bottom: 10px;
+            z-index: 50;
+            box-sizing: border-box;
+        }
+
+        #shop-container {
+            display: flex;
+            gap: 8px; /* 间距稍微缩小 */
+            margin-bottom: 10px;
+            padding: 0 10px;
+            width: 100%;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+
+        .card {
+            width: 105px; /* 稍微变窄 */
+            height: 130px; /* 变矮 */
+            flex-shrink: 0;
+            background: linear-gradient(160deg, #232526, #414345);
+            border: 1px solid #555;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .card:active { transform: scale(0.95); }
+        .card:hover { transform: translateY(-5px) scale(1.05); border-color: var(--accent); }
+        
+        .card[data-cost="1"] { border-color: var(--rare-1); box-shadow: 0 0 5px var(--rare-1); }
+        .card[data-cost="2"] { border-color: var(--rare-2); box-shadow: 0 0 5px var(--rare-2); }
+        .card[data-cost="3"] { border-color: var(--rare-3); box-shadow: 0 0 5px var(--rare-3); }
+
+        /* 卡片内的图片区域变大 */
+        .card-img {
+            width: 65px; 
+            height: 65px; 
+            border-radius: 6px;
+            background: rgba(0,0,0,0.3); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            margin-top: 4px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .card-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* 调整文字大小 */
+        .card-name { font-weight: 700; font-size: 12px; text-align: center; margin-top: 4px; text-shadow: 0 2px 4px #000; color: #fff; }
+        .card-meta { font-size: 9px; color: #bbb; text-align: center; white-space: nowrap; margin-top: 2px; }
+        .card-cost { 
+            position: absolute;
+            top: 4px; right: 4px;
+            font-weight: 800; color: #ffd700; font-size: 12px; 
+            background: rgba(0,0,0,0.8); padding: 1px 6px; border-radius: 8px;
+            z-index: 2;
+        }
+
+        #controls { display: flex; gap: 15px; }
+        
+        .btn {
+            padding: 10px 25px;
+            font-family: inherit;
+            font-size: 16px;
+            font-weight: 800;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .btn-reroll { background: transparent; color: #4da6ff; border: 2px solid #4da6ff; }
+        .btn-reroll:hover { background: rgba(77, 166, 255, 0.2); }
+        .btn-battle { background: linear-gradient(90deg, #ff416c, #ff4b2b); color: white; box-shadow: 0 4px 15px rgba(255, 65, 108, 0.4); }
+        .btn-battle:hover { transform: scale(1.05); }
+        .btn-disabled { filter: grayscale(100%); opacity: 0.6; cursor: not-allowed; }
+
+        /* Floating Text */
+        .float-text {
+            position: absolute;
+            font-weight: 900;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+            text-shadow: 2px 2px 0 #000, -1px -1px 0 #000;
+            z-index: 200;
+        }
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -120%) scale(1.3); }
+        }
+
+        /* --- MODALS --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(5px);
+            display: none; justify-content: center; align-items: center;
+            z-index: 1000;
+        }
+        .modal {
+            background: linear-gradient(135deg, #24243e, #0f0c29);
+            padding: 30px;
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+        }
+        .modal h2 { color: var(--accent); margin-top: 0; }
+        .input-field {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid #555;
+            color: white;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            width: 80%;
+            text-align: center;
+        }
+        .rank-list { text-align: left; max-height: 300px; overflow-y: auto; margin: 20px 0; }
+        .rank-item { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .rank-item:first-child { color: #ffd700; font-weight: bold; }
+
+        /* --- LOADING SCREEN --- */
+        #loading-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #0f0c29; z-index: 2000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .loader {
+            border: 5px solid #f3f3f3; border-top: 5px solid var(--accent);
+            border-radius: 50%; width: 50px; height: 50px;
+            animation: spin 1s linear infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- RESPONSIVE --- */
+        @media (max-width: 850px) {
+            #header { padding: 0 10px; }
+            .stat-group { font-size: 14px; gap: 10px; }
+            .ui-btn span { display: none; }
+            .ui-btn .icon { display: block; margin: 0; }
+            .ui-btn { padding: 8px; }
+            #main-area { flex-direction: column; }
+            #synergy-panel {
+                position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                z-index: 60; background: rgba(15, 12, 41, 0.95); display: none;
+            }
+            #synergy-panel.show-mobile { display: flex; }
+            #shop-container { justify-content: flex-start; overflow-x: auto; padding-bottom: 10px; }
+            #shop-container::-webkit-scrollbar { height: 4px; }
+            #shop-container::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+            #bottom-panel { height: auto; padding-bottom: 20px; }
+            .btn { padding: 10px 15px; font-size: 14px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading-screen">
+        <div class="loader"></div>
+        <div id="loading-text">Loading Assets...</div>
+    </div>
+
+    <div id="header">
+        <div class="stat-group">
+            <div class="stat-item"><span class="icon">❤️</span> <span id="ui-hp">100</span></div>
+            <div class="stat-item"><span class="icon">⚔️</span> <span id="ui-round">1</span></div>
+            <div class="stat-item"><span class="icon">💰</span> <span id="ui-gold">10</span></div>
+        </div>
+        
+        <div class="header-controls">
+            <div class="ui-btn" id="btn-toggle-syn" onclick="game.toggleSynergyPanel()" style="display: none;">
+                🔮
+            </div>
+            <div class="ui-btn" onclick="game.showRankings()">
+                🏆 <span id="ui-rank-btn">Rank</span>
+            </div>
+            <div class="ui-btn" onclick="game.toggleLang()">
+                🌐 <span id="ui-lang">English</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-area">
+        <div id="synergy-panel">
+            <h3 id="txt-syn-title">SYNERGIES</h3>
+            <div style="text-align: right; display: none;" id="close-syn-mobile"><button class="ui-btn" onclick="game.toggleSynergyPanel()">✖</button></div>
+            <div id="synergy-list"></div>
+        </div>
+
+        <div id="canvas-container">
+            <canvas id="gameCanvas" width="900" height="540"></canvas>
+        </div>
+    </div>
+
+    <div id="bottom-panel">
+        <div id="shop-container"></div>
+        <div id="controls">
+            <button class="btn btn-reroll" onclick="game.rerollShop()">
+                <span id="txt-reroll">Reroll</span> (2g)
+            </button>
+            <button id="btn-battle" class="btn btn-battle" onclick="game.toggleState()">
+                <span id="txt-battle">Start Battle</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="login-modal" class="modal-overlay">
+        <div class="modal">
+            <h2 id="modal-login-title">Welcome Commander</h2>
+            <p id="modal-login-desc">Enter your name to join the leaderboard</p>
+            <input type="text" id="username-input" class="input-field" placeholder="Player Name" maxlength="12">
+            <br>
+            <button class="btn btn-battle" onclick="game.login()">Start Game</button>
+        </div>
+    </div>
+
+    <div id="rank-modal" class="modal-overlay">
+        <div class="modal">
+            <h2 id="modal-rank-title">Leaderboard (Local)</h2>
+            <div class="rank-list" id="rank-list-content"></div>
+            <button class="btn btn-reroll" onclick="document.getElementById('rank-modal').style.display='none'">Close</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Localization Database ---
+        const LANG = {
+            en: {
+                hp: "HP", round: "Round", gold: "Gold",
+                synTitle: "ACTIVE SYNERGIES",
+                reroll: "Refresh",
+                battleStart: "BATTLE START",
+                battleFighting: "FIGHTING...",
+                battleNext: "NEXT ROUND",
+                victory: "VICTORY",
+                defeat: "DEFEAT",
+                gameOver: "GAME OVER",
+                emptyBench: "Bench Full!",
+                rankBtn: "Rank",
+                loginTitle: "Welcome Commander",
+                loginDesc: "Enter your name to join the leaderboard",
+                rankTitle: "Leaderboard (Local)",
+                synergies: {
+                    'Isekai': { name: "Isekai", desc: "Allies gain +25% ATK." },
+                    'Cyber': { name: "Cyber", desc: "Allies gain +35% ATK Speed." },
+                    'Magic': { name: "Arcane", desc: "Skills deal +40% Damage." },
+                    'School': { name: "Academy", desc: "Rangers gain +15% Crit Rate." },
+                    'Guardian': { name: "Guardian", desc: "Guardians gain +300 Shield." }
+                }
+            },
+            zh: {
+                hp: "生命", round: "回合", gold: "金币",
+                synTitle: "当前羁绊",
+                reroll: "刷新商店",
+                battleStart: "开始战斗",
+                battleFighting: "战斗中...",
+                battleNext: "下一回合",
+                victory: "战斗胜利",
+                defeat: "战斗失败",
+                gameOver: "游戏结束",
+                emptyBench: "备战区已满！",
+                rankBtn: "排行榜",
+                loginTitle: "欢迎指挥官",
+                loginDesc: "输入你的名字以记录战绩",
+                rankTitle: "排行榜 (本地)",
+                synergies: {
+                    'Isekai': { name: "异世界", desc: "全员攻击力 +25%。" },
+                    'Cyber': { name: "赛博", desc: "全员攻速 +35%。" },
+                    'Magic': { name: "奥术", desc: "技能伤害提升 40%。" },
+                    'School': { name: "学院", desc: "射手暴击率 +15%。" },
+                    'Guardian': { name: "守护者", desc: "守护者获得 +300 护盾。" }
+                }
+            }
+        };
+
+        // --- 2. Game Data & ASSETS ---
+        const TILE_SIZE = 90; 
+        const GRID_W = 10;
+        const GRID_H = 6;
+
+        // 图片资源映射表 (注意你的目录 assets)
+        const ASSET_SOURCES = {
+            'saber': 'assets/units/knight.png',
+            'archer': 'assets/units/ranger.png',
+            'mage': 'assets/units/witch.png',
+            'ninja': 'assets/units/ninja.png',
+            'tank': 'assets/units/mecha.png'
+        };
+
+        // 预加载的 Image 对象容器
+        const TEXTURES = {};
+
+        const UNIT_DB = {
+            'saber': { 
+                name: { en: 'Knight', zh: '骑士姬' }, 
+                cost: 1, hp: 700, dmg: 60, range: 1, speed: 1.1, 
+                origin: 'Isekai', class: 'Warrior'
+            },
+            'archer': { 
+                name: { en: 'Ranger', zh: '弓道部' }, 
+                cost: 2, hp: 500, dmg: 85, range: 4, speed: 0.85, 
+                origin: 'School', class: 'Ranger'
+            },
+            'mage': { 
+                name: { en: 'Witch', zh: '魔女' }, 
+                cost: 3, hp: 400, dmg: 130, range: 3, speed: 0.65, 
+                origin: 'Magic', class: 'Mage'
+            },
+            'ninja': { 
+                name: { en: 'Ninja', zh: '赛博忍' }, 
+                cost: 2, hp: 550, dmg: 95, range: 1, speed: 1.5, 
+                origin: 'Cyber', class: 'Assassin'
+            },
+            'tank': { 
+                name: { en: 'Mecha', zh: '重装机' }, 
+                cost: 1, hp: 1000, dmg: 35, range: 1, speed: 0.7, 
+                origin: 'Cyber', class: 'Guardian'
+            }
+        };
+
+        const SYNERGY_RULES = {
+            'Isekai': { req: 2, id: 'Isekai' },
+            'Cyber': { req: 2, id: 'Cyber' },
+            'Magic': { req: 2, id: 'Magic' },
+            'School': { req: 1, id: 'School' },
+            'Guardian': { req: 2, id: 'Guardian' }
+        };
+
+        // --- 3. Asset Loader ---
+        function loadAssets(callback) {
+            let loadedCount = 0;
+            const total = Object.keys(ASSET_SOURCES).length;
+            
+            // 如果没有资源，直接回调
+            if (total === 0) { callback(); return; }
+
+            for (let key in ASSET_SOURCES) {
+                const img = new Image();
+                img.src = ASSET_SOURCES[key];
+                img.onload = () => {
+                    TEXTURES[key] = img;
+                    loadedCount++;
+                    if (loadedCount >= total) callback();
+                };
+                img.onerror = () => {
+                    console.error("Failed to load: " + ASSET_SOURCES[key]);
+                    // 即使失败也继续，避免游戏卡死（可以用占位符逻辑，这里简化直接跳过）
+                    loadedCount++;
+                    if (loadedCount >= total) callback();
+                }
+            }
+        }
+
+        // --- 4. Classes ---
+
+        class Unit {
+            constructor(id, type, team, r, c) {
+                const data = UNIT_DB[type];
+                this.id = id;
+                this.type = type;
+                this.team = team; // 0: Player (Left/Bottom), 1: Enemy (Right/Top)
+                this.r = r;
+                this.c = c;
+                this.pixelX = c * TILE_SIZE + TILE_SIZE/2;
+                this.pixelY = r * TILE_SIZE + TILE_SIZE/2;
+                this.prevR = r;
+                this.prevC = c;
+
+                this.maxHp = data.hp;
+                this.hp = data.hp;
+                this.dmg = data.dmg;
+                this.range = data.range;
+                this.attackSpeed = data.speed;
+                this.origin = data.origin;
+                this.class = data.class;
+
+                this.isDead = false;
+                this.lastAttackTime = 0;
+                this.maxMana = 100;
+                this.mana = 0;
+                this.scale = 1;
+                this.facing = team === 0 ? 1 : -1; // 1: Right, -1: Left
+            }
+
+            snapToGrid() {
+                this.pixelX = this.c * TILE_SIZE + TILE_SIZE/2;
+                this.pixelY = this.r * TILE_SIZE + TILE_SIZE/2;
+            }
+
+            draw(ctx) {
+                if (this.isDead) return;
+
+                // 1. 绘制角色图片
+                const img = TEXTURES[this.type];
+                if (img) {
+                    ctx.save();
+                    ctx.translate(this.pixelX, this.pixelY);
+                    
+                    // 处理拖拽缩放 + 队伍镜像 (敌方单位翻转X轴)
+                    const dirX = this.team === 1 ? -1 : 1; 
+                    ctx.scale(dirX * this.scale, this.scale);
+
+                    // 绘制图片 (假设图片是 1:1，绘制为 80x80，留一点边距)
+                    const size = 80;
+                    ctx.drawImage(img, -size/2, -size/2, size, size);
+                    
+                    ctx.restore();
+                } else {
+                    // Fallback 如果图片没加载出来
+                    ctx.beginPath();
+                    ctx.arc(this.pixelX, this.pixelY, 30, 0, Math.PI*2);
+                    ctx.fillStyle = 'red';
+                    ctx.fill();
+                }
+
+                // 2. 选中/高亮光圈 (Optional)
+                if (this.scale > 1) {
+                    ctx.beginPath();
+                    ctx.arc(this.pixelX, this.pixelY, 45, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+
+                // 3. 血条和蓝条
+                const barW = 60;
+                const barX = this.pixelX - barW/2;
+                const barY = this.pixelY - 45;
+                
+                // 血条背景
+                ctx.fillStyle = '#2d3436';
+                ctx.beginPath(); ctx.roundRect(barX, barY, barW, 6, 3); ctx.fill();
+                // 血条前景
+                ctx.fillStyle = this.team === 0 ? '#00cec9' : '#ff7675';
+                ctx.beginPath(); ctx.roundRect(barX, barY, Math.max(0, barW * (this.hp / this.maxHp)), 6, 3); ctx.fill();
+                // 蓝条
+                ctx.fillStyle = '#fdcb6e';
+                ctx.beginPath(); ctx.roundRect(barX, barY+7, Math.max(0, barW * (this.mana / this.maxMana)), 3, 1); ctx.fill();
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                // Internal resolution (Logic)
+                this.width = 900; 
+                this.height = 540;
+                
+                // 1. Auto-detect Language
+                const browserLang = navigator.language || navigator.userLanguage; 
+                this.lang = browserLang.toLowerCase().startsWith('zh') ? 'zh' : 'en';
+
+                this.units = [];
+                this.gold = 12;
+                this.round = 1;
+                this.hp = 100;
+                this.state = 'PAUSED'; 
+                this.dragging = null;
+                this.username = "Guest";
+
+                // Mouse Events
+                this.canvas.addEventListener('mousedown', e => this.onDown(e));
+                this.canvas.addEventListener('mousemove', e => this.onMove(e));
+                document.addEventListener('mouseup', e => this.onUp(e));
+
+                // Touch Events
+                this.canvas.addEventListener('touchstart', e => {
+                    e.preventDefault(); 
+                    this.onDown(e.touches[0]);
+                }, {passive: false});
+                this.canvas.addEventListener('touchmove', e => {
+                    e.preventDefault();
+                    this.onMove(e.touches[0]);
+                }, {passive: false});
+                this.canvas.addEventListener('touchend', e => this.onUp(e.changedTouches[0]));
+
+                this.handleResize();
+                window.addEventListener('resize', () => this.handleResize());
+            }
+
+            init() {
+                document.getElementById('loading-screen').style.display = 'none';
+                this.checkLogin();
+                this.lastTime = performance.now();
+                requestAnimationFrame(t => this.loop(t));
+            }
+
+            handleResize() {
+                const isMobile = window.innerWidth <= 850;
+                document.getElementById('btn-toggle-syn').style.display = isMobile ? 'flex' : 'none';
+                document.getElementById('close-syn-mobile').style.display = isMobile ? 'block' : 'none';
+            }
+
+            toggleSynergyPanel() {
+                const p = document.getElementById('synergy-panel');
+                const btn = document.getElementById('btn-toggle-syn');
+                p.classList.toggle('show-mobile');
+                btn.classList.toggle('active');
+            }
+
+            // --- User & Storage System ---
+            checkLogin() {
+                const storedName = localStorage.getItem('ab_username');
+                if (storedName) {
+                    this.username = storedName;
+                    document.getElementById('login-modal').style.display = 'none';
+                    this.startNewGame();
+                } else {
+                    document.getElementById('login-modal').style.display = 'flex';
+                    this.updateLangUI(); 
+                }
+            }
+
+            login() {
+                const input = document.getElementById('username-input');
+                let name = input.value.trim();
+                if (!name) name = "Player-" + Math.floor(Math.random()*1000);
+                
+                this.username = name;
+                localStorage.setItem('ab_username', name);
+                document.getElementById('login-modal').style.display = 'none';
+                this.startNewGame();
+            }
+
+            saveScore() {
+                const scores = JSON.parse(localStorage.getItem('ab_scores') || '[]');
+                scores.push({ 
+                    name: this.username, 
+                    round: this.round, 
+                    date: new Date().toLocaleDateString() 
+                });
+                scores.sort((a, b) => b.round - a.round);
+                const topScores = scores.slice(0, 10);
+                localStorage.setItem('ab_scores', JSON.stringify(topScores));
+            }
+
+            showRankings() {
+                const scores = JSON.parse(localStorage.getItem('ab_scores') || '[]');
+                const list = document.getElementById('rank-list-content');
+                list.innerHTML = '';
+                
+                if (scores.length === 0) {
+                    list.innerHTML = '<div style="padding:10px; text-align:center; color:#aaa">No records yet.</div>';
+                } else {
+                    scores.forEach((s, i) => {
+                        const div = document.createElement('div');
+                        div.className = 'rank-item';
+                        div.innerHTML = `
+                            <span>#${i+1} ${s.name}</span>
+                            <span>R${s.round}</span>
+                            <span>${s.date}</span>
+                        `;
+                        list.appendChild(div);
+                    });
+                }
+                
+                document.getElementById('modal-rank-title').innerText = LANG[this.lang].rankTitle;
+                document.getElementById('rank-modal').style.display = 'flex';
+            }
+
+            startNewGame() {
+                this.units = [];
+                this.gold = 12;
+                this.round = 1;
+                this.hp = 100;
+                this.state = 'PLANNING';
+                this.spawnEnemy();
+                this.refreshShop();
+                this.updateLangUI();
+            }
+
+            // --- Localization ---
+            toggleLang() {
+                this.lang = this.lang === 'en' ? 'zh' : 'en';
+                this.updateLangUI();
+                this.refreshShop(false);
+                this.checkSynergies();
+            }
+
+            updateLangUI() {
+                const T = LANG[this.lang];
+                document.getElementById('ui-lang').innerText = this.lang === 'en' ? '切换中文' : 'Switch to English';
+                document.getElementById('txt-syn-title').innerText = T.synTitle;
+                document.getElementById('txt-reroll').innerText = T.reroll;
+                document.getElementById('ui-rank-btn').innerText = T.rankBtn;
+                
+                document.getElementById('modal-login-title').innerText = T.loginTitle;
+                document.getElementById('modal-login-desc').innerText = T.loginDesc;
+
+                const btn = document.getElementById('txt-battle');
+                if (this.state === 'PLANNING') btn.innerText = T.battleStart;
+                else if (this.state === 'FIGHTING') btn.innerText = T.battleFighting;
+                else btn.innerText = T.battleNext;
+            }
+
+            getText(key) { return LANG[this.lang][key]; }
+            getUnitName(type) { return UNIT_DB[type].name[this.lang]; }
+            getSynData(key) { return LANG[this.lang].synergies[key]; }
+
+            // --- Loop ---
+            loop(now) {
+                const dt = (now - this.lastTime) / 1000;
+                this.lastTime = now;
+                this.update(dt);
+                this.draw();
+                requestAnimationFrame(t => this.loop(t));
+            }
+
+            update(dt) {
+                if (this.state === 'FIGHTING') this.combatLogic(dt);
+                document.getElementById('ui-hp').innerText = this.hp;
+                document.getElementById('ui-round').innerText = this.round;
+                document.getElementById('ui-gold').innerText = this.gold;
+            }
+
+            // --- Combat ---
+            combatLogic(dt) {
+                const allies = this.units.filter(u => u.team === 0 && !u.isDead);
+                const enemies = this.units.filter(u => u.team === 1 && !u.isDead);
+
+                if (allies.length === 0 || enemies.length === 0) {
+                    this.endRound(allies.length > 0);
+                    return;
+                }
+
+                this.units.forEach(u => {
+                    if (u.isDead) return;
+                    let targets = u.team === 0 ? enemies : allies;
+                    let nearest = null, minDist = Infinity;
+                    targets.forEach(t => {
+                        let d = Math.hypot(t.pixelX - u.pixelX, t.pixelY - u.pixelY);
+                        if (d < minDist) { minDist = d; nearest = t; }
+                    });
+
+                    if (!nearest) return;
+                    let rangePx = u.range * TILE_SIZE;
+                    
+                    if (minDist <= rangePx) {
+                        if (performance.now()/1000 - u.lastAttackTime > (1/u.attackSpeed)) {
+                            this.attack(u, nearest);
+                        }
+                    } else {
+                        let angle = Math.atan2(nearest.pixelY - u.pixelY, nearest.pixelX - u.pixelX);
+                        let speed = 90 * dt;
+                        let vx = Math.cos(angle) * speed;
+                        let vy = Math.sin(angle) * speed;
+
+                        // Boid separation
+                        this.units.forEach(other => {
+                            if (u === other || other.isDead) return;
+                            let dx = u.pixelX - other.pixelX;
+                            let dy = u.pixelY - other.pixelY;
+                            let dist = Math.hypot(dx, dy);
+                            if (dist < 50 && dist > 0) {
+                                let force = (50 - dist) / dist;
+                                let push = 200 * dt; 
+                                vx += dx * force * push;
+                                vy += dy * force * push;
+                            }
+                        });
+
+                        u.pixelX += vx;
+                        u.pixelY += vy;
+                    }
+                    u.pixelX = Math.max(30, Math.min(this.width - 30, u.pixelX));
+                    u.pixelY = Math.max(30, Math.min(this.height - 30, u.pixelY));
+                });
+            }
+
+            attack(attacker, target) {
+                attacker.lastAttackTime = performance.now() / 1000;
+                let isCrit = Math.random() < 0.15;
+                let dmg = isCrit ? Math.floor(attacker.dmg * 1.5) : attacker.dmg;
+                target.hp -= dmg;
+                attacker.mana += 15;
+                this.spawnFloatText(target.pixelX, target.pixelY, dmg, isCrit ? '#fffa65' : '#fff', isCrit);
+
+                if (target.hp <= 0) {
+                    target.hp = 0;
+                    target.isDead = true;
+                }
+
+                if (attacker.mana >= attacker.maxMana) {
+                    attacker.mana = 0;
+                    this.spawnFloatText(attacker.pixelX, attacker.pixelY - 40, "ULTIMATE!", '#00d2d3', true);
+                    target.hp -= 150; 
+                }
+            }
+
+            // --- Interaction ---
+            getMouse(e) {
+                const r = this.canvas.getBoundingClientRect();
+                const scaleX = this.width / r.width;
+                const scaleY = this.height / r.height;
+                
+                return { 
+                    x: (e.clientX - r.left) * scaleX, 
+                    y: (e.clientY - r.top) * scaleY 
+                };
+            }
+
+            onDown(e) {
+                if (this.state !== 'PLANNING') return;
+                const { x, y } = this.getMouse(e);
+                
+                for (let i = this.units.length - 1; i >= 0; i--) {
+                    let u = this.units[i];
+                    if (u.team === 0 && Math.hypot(x - u.pixelX, y - u.pixelY) < 40) {
+                        this.dragging = u;
+                        u.prevR = u.r; u.prevC = u.c;
+                        u.scale = 1.2;
+                        break;
+                    }
+                }
+            }
+            onMove(e) {
+                if (!this.dragging) return;
+                const { x, y } = this.getMouse(e);
+                this.dragging.pixelX = x;
+                this.dragging.pixelY = y;
+            }
+            onUp(e) {
+                if (!this.dragging) return;
+                const u = this.dragging;
+                u.scale = 1;
+                let c = Math.floor(u.pixelX / TILE_SIZE);
+                let r = Math.floor(u.pixelY / TILE_SIZE);
+                
+                if (r < 3) r = 3; if (r >= GRID_H) r = GRID_H - 1;
+                if (c < 0) c = 0; if (c >= GRID_W) c = GRID_W - 1;
+
+                let target = this.units.find(other => other !== u && other.team === 0 && other.r === r && other.c === c && !other.isDead);
+                if (target) {
+                    target.r = u.prevR; target.c = u.prevC; target.snapToGrid();
+                }
+                u.r = r; u.c = c; u.snapToGrid();
+                this.dragging = null;
+            }
+
+            // --- Logic ---
+            buyUnit(type) {
+                if (this.state !== 'PLANNING') return;
+                const cost = UNIT_DB[type].cost;
+                if (this.gold >= cost) {
+                    for(let r=3; r<GRID_H; r++) {
+                        for(let c=0; c<GRID_W; c++) {
+                            if (!this.units.find(u => u.team===0 && u.r===r && u.c===c)) {
+                                this.gold -= cost;
+                                this.units.push(new Unit(Date.now(), type, 0, r, c));
+                                this.checkSynergies();
+                                return;
+                            }
+                        }
+                    }
+                    alert(this.getText('emptyBench'));
+                }
+            }
+
+            rerollShop() {
+                if (this.gold >= 2) {
+                    this.gold -= 2;
+                    this.refreshShop(true);
+                }
+            }
+
+            refreshShop(randomize = true) {
+                const container = document.getElementById('shop-container');
+                if (randomize) {
+                    this.currentShopTypes = [];
+                    const keys = Object.keys(UNIT_DB);
+                    for(let i=0; i<5; i++) this.currentShopTypes.push(keys[Math.floor(Math.random() * keys.length)]);
+                }
+                container.innerHTML = '';
+                this.currentShopTypes.forEach(type => {
+                    const data = UNIT_DB[type];
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.dataset.cost = data.cost;
+                    const name = this.getUnitName(type);
+                    const originName = this.getSynData(data.origin)?.name || data.origin;
+                    const className = this.getSynData(data.class)?.name || data.class;
+
+                    // 修改：使用图片而不是 Emoji
+                    card.innerHTML = `
+                        <div class="card-cost">💎 ${data.cost}</div>
+                        <div class="card-img">
+                            <img src="${ASSET_SOURCES[type]}" alt="${type}">
+                        </div>
+                        <div class="card-name">${name}</div>
+                        <div class="card-meta">${originName} • ${className}</div>
+                    `;
+                    card.onclick = () => this.buyUnit(type);
+                    container.appendChild(card);
+                });
+            }
+
+            checkSynergies() {
+                const counts = {};
+                const team = this.units.filter(u => u.team === 0);
+                team.forEach(u => {
+                    counts[u.origin] = (counts[u.origin] || 0) + 1;
+                    counts[u.class] = (counts[u.class] || 0) + 1;
+                });
+                const list = document.getElementById('synergy-list');
+                list.innerHTML = '';
+                Object.keys(counts).forEach(key => {
+                    const rule = SYNERGY_RULES[key];
+                    if (!rule) return;
+                    const count = counts[key];
+                    const isActive = count >= rule.req;
+                    const info = this.getSynData(key);
+                    if (isActive) {
+                        if (key === 'Isekai') team.forEach(u => { if(u.origin===key) u.dmg = u.maxHp * 0.1 + 60; });
+                    }
+                    const div = document.createElement('div');
+                    div.className = `syn-box ${isActive ? 'active' : ''}`;
+                    div.innerHTML = `
+                        <div class="syn-header"><span>${info.name}</span><span>${count} / ${rule.req}</span></div>
+                        <div class="syn-desc">${info.desc}</div>
+                    `;
+                    list.appendChild(div);
+                });
+            }
+
+            spawnEnemy() {
+                const count = 2 + Math.floor(this.round * 0.6);
+                for(let i=0; i<count; i++) {
+                    const types = Object.keys(UNIT_DB);
+                    const type = types[Math.floor(Math.random()*types.length)];
+                    const r = Math.floor(Math.random() * 3);
+                    const c = Math.floor(Math.random() * GRID_W);
+                    if (!this.units.find(u=>u.team===1 && u.r===r && u.c===c)) {
+                        this.units.push(new Unit(Date.now()+i, type, 1, r, c));
+                    }
+                }
+            }
+
+            toggleState() {
+                if (this.state === 'PLANNING') {
+                    this.state = 'FIGHTING';
+                    this.updateLangUI();
+                    document.getElementById('btn-battle').classList.add('btn-disabled');
+                }
+            }
+
+            endRound(win) {
+                if (!win) {
+                    this.hp -= 10;
+                    if (this.hp <= 0) {
+                        this.hp = 0;
+                        this.state = 'GAME_OVER';
+                        this.spawnFloatText(this.width/2, this.height/2, this.getText('gameOver'), '#ff416c', true);
+                        this.saveScore();
+                        setTimeout(() => this.showRankings(), 2000);
+                        return;
+                    }
+                }
+                
+                this.state = 'PLANNING';
+                document.getElementById('btn-battle').classList.remove('btn-disabled');
+                
+                const msg = win ? this.getText('victory') : this.getText('defeat');
+                const color = win ? '#ffeaa7' : '#ff7675';
+                this.spawnFloatText(this.width/2, this.height/2, msg, color, true);
+
+                this.gold += 5;
+                this.round++;
+                
+                this.units = this.units.filter(u => u.team === 0);
+                this.units.forEach(u => {
+                    u.isDead = false; u.hp = u.maxHp; u.mana = 0; u.snapToGrid();
+                });
+                this.spawnEnemy();
+                this.refreshShop(true);
+                this.updateLangUI();
+            }
+
+            draw() {
+                this.ctx.clearRect(0,0,this.width,this.height);
+                
+                // 1. 绘制棋盘格 (Checkerboard Overlay)
+                // 这比单纯的线条更清晰，且能压暗背景让角色更突出
+                for(let r = 0; r < GRID_H; r++) {
+                    for(let c = 0; c < GRID_W; c++) {
+                        const x = c * TILE_SIZE;
+                        const y = r * TILE_SIZE;
+                        
+                        // 偶数格和奇数格使用不同的透明度
+                        // 一种是稍微亮的白，一种是稍微暗的黑
+                        if ((r + c) % 2 === 0) {
+                            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.05)'; // 极淡的亮格
+                        } else {
+                            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; // 稍明显的暗格
+                        }
+                        this.ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+                        // 可选：如果你还是想要边框，可以叠加一个极淡的线
+                        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+                        this.ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+                    }
+                }
+
+                // 2. 绘制分界线 (己方区域/敌方区域)
+                // 在第3行下方画一条显眼的线
+                const midY = 3 * TILE_SIZE;
+                
+                // 发光效果
+                this.ctx.shadowBlur = 10;
+                this.ctx.shadowColor = '#ff4757';
+                this.ctx.strokeStyle = 'rgba(255, 71, 87, 0.6)';
+                this.ctx.lineWidth = 3;
+                this.ctx.beginPath(); 
+                this.ctx.moveTo(0, midY); 
+                this.ctx.lineTo(this.width, midY); 
+                this.ctx.stroke();
+                
+                // 重置阴影，以免影响后续绘制
+                this.ctx.shadowBlur = 0;
+
+                // 3. 绘制单位 (简单的深度排序)
+                this.units.sort((a,b) => a.pixelY - b.pixelY);
+                
+                this.units.forEach(u => {
+                    // 给单位脚下加一个黑色椭圆阴影，增加立体感
+                    this.ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                    this.ctx.beginPath();
+                    this.ctx.ellipse(u.pixelX, u.pixelY + 30, 25, 10, 0, 0, Math.PI*2);
+                    this.ctx.fill();
+                    
+                    u.draw(this.ctx);
+                });
+
+                if (this.dragging) {
+                    this.dragging.draw(this.ctx);
+                    
+                    // 拖拽时高亮目标格子
+                    const c = Math.floor(this.dragging.pixelX / TILE_SIZE);
+                    const r = Math.floor(this.dragging.pixelY / TILE_SIZE);
+                    if (c >= 0 && c < GRID_W && r >= 3 && r < GRID_H) {
+                        this.ctx.fillStyle = 'rgba(0, 242, 96, 0.3)'; // 绿色高亮
+                        this.ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        this.ctx.strokeStyle = '#00f260';
+                        this.ctx.strokeRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    }
+                }
+            }
+
+            spawnFloatText(x, y, text, color, isBig) {
+                const rect = this.canvas.getBoundingClientRect();
+                const scaleX = rect.width / this.width;
+                const scaleY = rect.height / this.height;
+
+                const el = document.createElement('div');
+                el.className = 'float-text';
+                el.innerText = text;
+                el.style.color = color;
+                
+                el.style.left = (rect.left + x * scaleX) + 'px';
+                el.style.top = (rect.top + y * scaleY - 40) + 'px';
+                
+                el.style.fontSize = isBig ? '32px' : '20px';
+                if(isBig) el.style.zIndex = 300;
+                document.body.appendChild(el);
+                setTimeout(() => el.remove(), 900);
+            }
+        }
+
+        const game = new Game();
+        // 启动资源加载
+        loadAssets(() => game.init());
+
+    </script>
+</body>
+</html>
