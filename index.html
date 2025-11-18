@@ -950,7 +950,7 @@
                     const originName = this.getSynData(data.origin)?.name || data.origin;
                     const className = this.getSynData(data.class)?.name || data.class;
 
-                    // 修改：使用图片而不是 Emoji
+                    // 修改 refreshShop 方法中的 card.innerHTML
                     card.innerHTML = `
                         <div class="card-cost">💎 ${data.cost}</div>
                         <div class="card-img">
